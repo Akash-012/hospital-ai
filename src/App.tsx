@@ -10,7 +10,14 @@ import RADT from "./pages/RADT";
 import OPDConsultation from "./pages/OPDConsultation";
 import Billing from "./pages/Billing";
 import Pharmacy from "./pages/Pharmacy";
+import Laboratory from "./pages/Laboratory";
 import Visitors from "./pages/Visitors";
+import OperationTheatre from "./pages/OperationTheatre";
+import NursingDesk from "./pages/NursingDesk";
+import Roster from "./pages/Roster";
+import DietKitchen from "./pages/DietKitchen";
+import Inventory from "./pages/Inventory";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,7 +43,14 @@ const App = () => (
                   <Route path="/opd" element={<OPDConsultation />} />
                   <Route path="/billing" element={<Billing />} />
                   <Route path="/pharmacy" element={<Pharmacy />} />
+                  <Route path="/lab" element={<Laboratory />} />
                   <Route path="/visitors" element={<Visitors />} />
+                  <Route path="/ot" element={<OperationTheatre />} />
+                  <Route path="/nursing" element={<NursingDesk />} />
+                  <Route path="/roster" element={<Roster />} />
+                  <Route path="/diet" element={<DietKitchen />} />
+                  <Route path="/inventory" element={<Inventory />} />
+                  <Route path="/reports" element={<Reports />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
