@@ -24,7 +24,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { LogOut, User } from "lucide-react";
 
 const mainModules = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -46,6 +50,7 @@ const additionalModules = [
 ];
 
 export function AppSidebar() {
+  const { user, signOut } = useAuth();
   const getNavClass = ({ isActive }: { isActive: boolean }) =>
     isActive
       ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
@@ -100,6 +105,24 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      
+      <SidebarFooter className="border-t border-sidebar-border p-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm text-sidebar-foreground px-2">
+            <User className="h-4 w-4" />
+            <span className="truncate">{user?.email}</span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full justify-start gap-2"
+            onClick={signOut}
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }
