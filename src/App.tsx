@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import RADT from "./pages/RADT";
+import Appointments from "./pages/Appointments";
 import OPDConsultation from "./pages/OPDConsultation";
 import Billing from "./pages/Billing";
 import Pharmacy from "./pages/Pharmacy";
@@ -50,6 +51,7 @@ const App = () => (
                           <Routes>
                             <Route path="/" element={<Dashboard />} />
                             <Route path="/radt" element={<RADT />} />
+                            <Route path="/appointments" element={<Appointments />} />
                             <Route path="/opd" element={<OPDConsultation />} />
                             <Route path="/billing" element={<Billing />} />
                             <Route path="/pharmacy" element={<Pharmacy />} />

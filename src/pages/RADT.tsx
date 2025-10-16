@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -6,9 +8,113 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, Users, LogOut, ArrowRightLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function RADT() {
   const [activeTab, setActiveTab] = useState("registration");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Form states for patient registration
+  const [patientForm, setPatientForm] = useState<{
+    full_name: string;
+    date_of_birth: string;
+    gender: "male" | "female" | "other" | "";
+    phone: string;
+    email: string;
+    address: string;
+    blood_group: string;
+    emergency_contact_name: string;
+    emergency_contact_phone: string;
+  }>({
+    full_name: "",
+    date_of_birth: "",
+    gender: "",
+    phone: "",
+    email: "",
+    address: "",
+    blood_group: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: ""
+  });
+
+  // Fetch patients
+  const { data: patients } = useQuery({
+    queryKey: ['patients'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Create patient mutation
+  const createPatient = useMutation({
+    mutationFn: async (patientData: typeof patientForm) => {
+      // Generate patient ID
+      const { count } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true });
+      
+      const patientId = `PT${String((count || 0) + 1).padStart(5, '0')}`;
+      
+      const { data, error } = await supabase
+        .from('patients')
+        .insert([{ 
+          ...patientData, 
+          patient_id: patientId,
+          gender: patientData.gender as "male" | "female" | "other"
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Patient registered successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      setPatientForm({
+        full_name: "",
+        date_of_birth: "",
+        gender: "",
+        phone: "",
+        email: "",
+        address: "",
+        blood_group: "",
+        emergency_contact_name: "",
+        emergency_contact_phone: ""
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleRegisterPatient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patientForm.full_name || !patientForm.phone || !patientForm.gender) {
+      toast({
+        title: "Error",
+        description: "Please fill all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createPatient.mutate(patientForm);
+  };
 
   return (
     <div className="space-y-6">
@@ -25,13 +131,13 @@ export default function RADT() {
             <UserPlus className="h-4 w-4" />
             Registration
           </TabsTrigger>
+          <TabsTrigger value="patients" className="gap-2">
+            <Users className="h-4 w-4" />
+            Patients List
+          </TabsTrigger>
           <TabsTrigger value="admission" className="gap-2">
             <Users className="h-4 w-4" />
             Admission
-          </TabsTrigger>
-          <TabsTrigger value="transfer" className="gap-2">
-            <ArrowRightLeft className="h-4 w-4" />
-            Transfer
           </TabsTrigger>
           <TabsTrigger value="discharge" className="gap-2">
             <LogOut className="h-4 w-4" />
@@ -45,127 +151,192 @@ export default function RADT() {
               <CardTitle>New Patient Registration</CardTitle>
               <CardDescription>Register a new patient in the system</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="patientId">Patient ID</Label>
-                  <Input id="patientId" placeholder="Auto-generated" disabled />
+            <CardContent>
+              <form onSubmit={handleRegisterPatient} className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="full_name">Full Name *</Label>
+                    <Input 
+                      id="full_name" 
+                      value={patientForm.full_name}
+                      onChange={(e) => setPatientForm({...patientForm, full_name: e.target.value})}
+                      placeholder="Enter full name" 
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input 
+                      id="phone" 
+                      type="tel" 
+                      value={patientForm.phone}
+                      onChange={(e) => setPatientForm({...patientForm, phone: e.target.value})}
+                      placeholder="Enter phone number" 
+                      required
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="regDate">Registration Date</Label>
-                  <Input id="regDate" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
-                </div>
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name *</Label>
-                  <Input id="firstName" placeholder="Enter first name" />
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="date_of_birth">Date of Birth</Label>
+                    <Input 
+                      id="date_of_birth" 
+                      type="date" 
+                      value={patientForm.date_of_birth}
+                      onChange={(e) => setPatientForm({...patientForm, date_of_birth: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Gender *</Label>
+                    <Select 
+                      value={patientForm.gender}
+                      onValueChange={(value) => setPatientForm({...patientForm, gender: value as "male" | "female" | "other"})}
+                      required
+                    >
+                      <SelectTrigger id="gender">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="blood_group">Blood Group</Label>
+                    <Select 
+                      value={patientForm.blood_group}
+                      onValueChange={(value) => setPatientForm({...patientForm, blood_group: value})}
+                    >
+                      <SelectTrigger id="blood_group">
+                        <SelectValue placeholder="Select blood group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="A+">A+</SelectItem>
+                        <SelectItem value="A-">A-</SelectItem>
+                        <SelectItem value="B+">B+</SelectItem>
+                        <SelectItem value="B-">B-</SelectItem>
+                        <SelectItem value="AB+">AB+</SelectItem>
+                        <SelectItem value="AB-">AB-</SelectItem>
+                        <SelectItem value="O+">O+</SelectItem>
+                        <SelectItem value="O-">O-</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="middleName">Middle Name</Label>
-                  <Input id="middleName" placeholder="Enter middle name" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name *</Label>
-                  <Input id="lastName" placeholder="Enter last name" />
-                </div>
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="dob">Date of Birth *</Label>
-                  <Input id="dob" type="date" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      value={patientForm.email}
+                      onChange={(e) => setPatientForm({...patientForm, email: e.target.value})}
+                      placeholder="Enter email" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input 
+                      id="address" 
+                      value={patientForm.address}
+                      onChange={(e) => setPatientForm({...patientForm, address: e.target.value})}
+                      placeholder="Enter address" 
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
-                  <Input id="age" placeholder="Auto-calculated" disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender *</Label>
-                  <Select>
-                    <SelectTrigger id="gender">
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="mobile">Mobile Number *</Label>
-                  <Input id="mobile" type="tel" placeholder="Enter mobile number" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
+                    <Input 
+                      id="emergency_contact_name" 
+                      value={patientForm.emergency_contact_name}
+                      onChange={(e) => setPatientForm({...patientForm, emergency_contact_name: e.target.value})}
+                      placeholder="Enter contact name" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="emergency_contact_phone">Emergency Contact Phone</Label>
+                    <Input 
+                      id="emergency_contact_phone" 
+                      type="tel" 
+                      value={patientForm.emergency_contact_phone}
+                      onChange={(e) => setPatientForm({...patientForm, emergency_contact_phone: e.target.value})}
+                      placeholder="Enter contact phone" 
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="Enter email address" />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Address *</Label>
-                <Input id="address" placeholder="Enter complete address" />
-              </div>
+                <div className="flex gap-3 justify-end">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => setPatientForm({
+                      full_name: "",
+                      date_of_birth: "",
+                      gender: "",
+                      phone: "",
+                      email: "",
+                      address: "",
+                      blood_group: "",
+                      emergency_contact_name: "",
+                      emergency_contact_phone: ""
+                    })}
+                  >
+                    Reset
+                  </Button>
+                  <Button type="submit" disabled={createPatient.isPending}>
+                    {createPatient.isPending ? "Registering..." : "Register Patient"}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" placeholder="Enter city" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input id="state" placeholder="Enter state" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pincode">Pincode</Label>
-                  <Input id="pincode" placeholder="Enter pincode" />
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="bloodGroup">Blood Group</Label>
-                  <Select>
-                    <SelectTrigger id="bloodGroup">
-                      <SelectValue placeholder="Select blood group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="a+">A+</SelectItem>
-                      <SelectItem value="a-">A-</SelectItem>
-                      <SelectItem value="b+">B+</SelectItem>
-                      <SelectItem value="b-">B-</SelectItem>
-                      <SelectItem value="ab+">AB+</SelectItem>
-                      <SelectItem value="ab-">AB-</SelectItem>
-                      <SelectItem value="o+">O+</SelectItem>
-                      <SelectItem value="o-">O-</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="patientType">Patient Type *</Label>
-                  <Select>
-                    <SelectTrigger id="patientType">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">General</SelectItem>
-                      <SelectItem value="insurance">Insurance</SelectItem>
-                      <SelectItem value="corporate">Corporate</SelectItem>
-                      <SelectItem value="cashless">Cashless</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex gap-3 justify-end">
-                <Button variant="outline">Reset</Button>
-                <Button>Register Patient</Button>
-              </div>
+        <TabsContent value="patients" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Registered Patients</CardTitle>
+              <CardDescription>View all registered patients</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Patient ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Gender</TableHead>
+                    <TableHead>Blood Group</TableHead>
+                    <TableHead>Registration Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {patients && patients.length > 0 ? (
+                    patients.map((patient: any) => (
+                      <TableRow key={patient.id}>
+                        <TableCell className="font-medium">{patient.patient_id}</TableCell>
+                        <TableCell>{patient.full_name}</TableCell>
+                        <TableCell>{patient.phone}</TableCell>
+                        <TableCell className="capitalize">{patient.gender}</TableCell>
+                        <TableCell>{patient.blood_group || "-"}</TableCell>
+                        <TableCell>{new Date(patient.created_at).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        No patients registered yet
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
@@ -176,115 +347,9 @@ export default function RADT() {
               <CardTitle>Patient Admission</CardTitle>
               <CardDescription>Admit a registered patient for in-patient care</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="searchPatient">Search Patient</Label>
-                  <Input id="searchPatient" placeholder="Enter Patient ID or Name" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admissionDate">Admission Date *</Label>
-                  <Input id="admissionDate" type="datetime-local" defaultValue={new Date().toISOString().slice(0, 16)} />
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="admissionType">Admission Type *</Label>
-                  <Select>
-                    <SelectTrigger id="admissionType">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="emergency">Emergency</SelectItem>
-                      <SelectItem value="planned">Planned</SelectItem>
-                      <SelectItem value="casualty">Casualty</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department *</Label>
-                  <Select>
-                    <SelectTrigger id="department">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">General Medicine</SelectItem>
-                      <SelectItem value="surgery">Surgery</SelectItem>
-                      <SelectItem value="ortho">Orthopedics</SelectItem>
-                      <SelectItem value="cardio">Cardiology</SelectItem>
-                      <SelectItem value="neuro">Neurology</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="consultingDoc">Consulting Doctor *</Label>
-                  <Select>
-                    <SelectTrigger id="consultingDoc">
-                      <SelectValue placeholder="Select doctor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dr-smith">Dr. John Smith</SelectItem>
-                      <SelectItem value="dr-johnson">Dr. Sarah Johnson</SelectItem>
-                      <SelectItem value="dr-williams">Dr. Mike Williams</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="wardType">Ward Type *</Label>
-                  <Select>
-                    <SelectTrigger id="wardType">
-                      <SelectValue placeholder="Select ward" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">General Ward</SelectItem>
-                      <SelectItem value="private">Private Room</SelectItem>
-                      <SelectItem value="icu">ICU</SelectItem>
-                      <SelectItem value="deluxe">Deluxe Room</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bedNumber">Bed Number</Label>
-                <Select>
-                  <SelectTrigger id="bedNumber">
-                    <SelectValue placeholder="Select available bed" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="101">Bed 101 - General Ward A</SelectItem>
-                    <SelectItem value="102">Bed 102 - General Ward A</SelectItem>
-                    <SelectItem value="201">Bed 201 - Private Wing</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="admissionNotes">Admission Notes</Label>
-                <Input id="admissionNotes" placeholder="Enter admission notes" />
-              </div>
-
-              <div className="flex gap-3 justify-end">
-                <Button variant="outline">Cancel</Button>
-                <Button>Admit Patient</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="transfer" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Patient Transfer</CardTitle>
-              <CardDescription>Transfer patient to different ward or department</CardDescription>
-            </CardHeader>
             <CardContent>
               <div className="text-center py-12 text-muted-foreground">
-                Transfer module coming soon...
+                Admission module coming soon...
               </div>
             </CardContent>
           </Card>
@@ -294,7 +359,7 @@ export default function RADT() {
           <Card>
             <CardHeader>
               <CardTitle>Patient Discharge</CardTitle>
-              <CardDescription>Process patient discharge and generate summary</CardDescription>
+              <CardDescription>Process patient discharge</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-center py-12 text-muted-foreground">

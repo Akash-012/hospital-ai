@@ -8,11 +8,13 @@ import {
   FlaskConical,
   Activity,
   Calendar,
+  CalendarDays,
   LayoutDashboard,
   FileText,
   Package,
   Utensils,
   ClipboardList,
+  UserPlus,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,7 +34,8 @@ import { LogOut, User } from "lucide-react";
 
 const mainModules = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "RADT", url: "/radt", icon: Users },
+  { title: "RADT", url: "/radt", icon: UserPlus },
+  { title: "Appointments", url: "/appointments", icon: CalendarDays },
   { title: "OPD Consultation", url: "/opd", icon: Stethoscope },
   { title: "Billing", url: "/billing", icon: CreditCard },
   { title: "Pharmacy", url: "/pharmacy", icon: Pill },

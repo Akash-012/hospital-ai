@@ -1,43 +1,159 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Activity, Pill, DollarSign, UserCheck, Bed } from "lucide-react";
 
 export default function Dashboard() {
+  // Fetch real-time statistics
+  const { data: patients } = useQuery({
+    queryKey: ['patients-count'],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true });
+      return count || 0;
+    }
+  });
+
+  const { data: activeIPD } = useQuery({
+    queryKey: ['active-ipd'],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('ipd_admissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'admitted');
+      return count || 0;
+    }
+  });
+
+  const { data: todayRevenue } = useQuery({
+    queryKey: ['today-revenue'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('bills')
+        .select('total_amount')
+        .gte('bill_date', today)
+        .eq('status', 'paid');
+      return data?.reduce((sum, bill) => sum + Number(bill.total_amount), 0) || 0;
+    }
+  });
+
+  const { data: todayVisitors } = useQuery({
+    queryKey: ['today-visitors'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { count } = await supabase
+        .from('visitors')
+        .select('*', { count: 'exact', head: true })
+        .gte('check_in_time', today);
+      return count || 0;
+    }
+  });
+
+  const { data: todayPharmacySales } = useQuery({
+    queryKey: ['today-pharmacy-sales'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('pharmacy_sales')
+        .select('total_amount')
+        .gte('sale_date', today);
+      return data?.reduce((sum, sale) => sum + Number(sale.total_amount), 0) || 0;
+    }
+  });
+
+  const { data: todayLabTests } = useQuery({
+    queryKey: ['today-lab-tests'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { count } = await supabase
+        .from('lab_orders')
+        .select('*', { count: 'exact', head: true })
+        .gte('order_date', today);
+      return count || 0;
+    }
+  });
+
+  const { data: recentAppointments } = useQuery({
+    queryKey: ['recent-appointments'],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          patients (full_name),
+          staff!appointments_doctor_id_fkey (full_name)
+        `)
+        .eq('appointment_date', today)
+        .order('appointment_time', { ascending: true })
+        .limit(3);
+      return data || [];
+    }
+  });
+
+  const { data: pendingBills } = useQuery({
+    queryKey: ['pending-bills'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('bills')
+        .select(`
+          *,
+          patients (full_name)
+        `)
+        .eq('status', 'pending')
+        .order('bill_date', { ascending: false })
+        .limit(3);
+      return data || [];
+    }
+  });
+
+  const { data: lowStockItems } = useQuery({
+    queryKey: ['low-stock-items'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('pharmacy_inventory')
+        .select('*')
+        .lt('stock_quantity', 'reorder_level')
+        .limit(3);
+      return data || [];
+    }
+  });
+
   const stats = [
     {
       title: "Total Patients",
-      value: "1,284",
+      value: patients?.toString() || "0",
       icon: Users,
       variant: "primary" as const,
-      trend: { value: "12% from last month", isPositive: true },
     },
     {
       title: "Active IPD",
-      value: "142",
+      value: activeIPD?.toString() || "0",
       icon: Bed,
       variant: "secondary" as const,
-      trend: { value: "8% from last week", isPositive: true },
     },
     {
       title: "OPD Today",
-      value: "89",
+      value: recentAppointments?.length.toString() || "0",
       icon: Activity,
       variant: "success" as const,
-      trend: { value: "3% from yesterday", isPositive: false },
     },
     {
       title: "Revenue Today",
-      value: "₹2.4L",
+      value: `₹${((todayRevenue || 0) / 1000).toFixed(1)}K`,
       icon: DollarSign,
       variant: "warning" as const,
-      trend: { value: "18% from yesterday", isPositive: true },
     },
   ];
 
   const quickStats = [
-    { label: "Visitors Today", value: "156", icon: UserCheck },
-    { label: "Pharmacy Sales", value: "₹84K", icon: Pill },
-    { label: "Lab Tests", value: "47", icon: Activity },
+    { label: "Visitors Today", value: todayVisitors?.toString() || "0", icon: UserCheck },
+    { label: "Pharmacy Sales", value: `₹${((todayPharmacySales || 0) / 1000).toFixed(0)}K`, icon: Pill },
+    { label: "Lab Tests", value: todayLabTests?.toString() || "0", icon: Activity },
   ];
 
   return (
@@ -63,25 +179,8 @@ export default function Dashboard() {
             <CardTitle>Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { time: "10:30 AM", action: "New patient registration", patient: "John Doe", type: "OPD" },
-                { time: "10:15 AM", action: "Discharge completed", patient: "Sarah Smith", type: "IPD" },
-                { time: "10:00 AM", action: "Lab report ready", patient: "Mike Johnson", type: "Lab" },
-                { time: "09:45 AM", action: "Surgery scheduled", patient: "Emma Wilson", type: "OT" },
-                { time: "09:30 AM", action: "Pharmacy order", patient: "Robert Brown", type: "Pharmacy" },
-              ].map((activity, i) => (
-                <div key={i} className="flex items-center justify-between border-b pb-3 last:border-0">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{activity.action}</p>
-                    <p className="text-xs text-muted-foreground">{activity.patient}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">{activity.time}</p>
-                    <span className="text-xs font-medium text-primary">{activity.type}</span>
-                  </div>
-                </div>
-              ))}
+            <div className="text-center py-8 text-muted-foreground">
+              Real-time activity feed coming soon
             </div>
           </CardContent>
         </Card>
@@ -103,26 +202,6 @@ export default function Dashboard() {
                   <span className="text-lg font-bold">{stat.value}</span>
                 </div>
               ))}
-              
-              <div className="pt-4 border-t">
-                <h4 className="text-sm font-semibold mb-3">Bed Occupancy</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">General Ward</span>
-                    <span className="font-medium">85%</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: "85%" }} />
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">ICU</span>
-                    <span className="font-medium">60%</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-secondary rounded-full" style={{ width: "60%" }} />
-                  </div>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -135,19 +214,19 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {[
-                { time: "11:00 AM", doctor: "Dr. Smith", patient: "Alice Cooper" },
-                { time: "11:30 AM", doctor: "Dr. Johnson", patient: "Bob Martin" },
-                { time: "12:00 PM", doctor: "Dr. Williams", patient: "Carol Davis" },
-              ].map((appt, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-medium">{appt.time}</p>
-                    <p className="text-xs text-muted-foreground">{appt.patient}</p>
+              {recentAppointments && recentAppointments.length > 0 ? (
+                recentAppointments.map((appt: any) => (
+                  <div key={appt.id} className="flex items-center justify-between text-sm">
+                    <div>
+                      <p className="font-medium">{appt.appointment_time}</p>
+                      <p className="text-xs text-muted-foreground">{appt.patients?.full_name}</p>
+                    </div>
+                    <span className="text-xs text-primary">{appt.staff?.full_name}</span>
                   </div>
-                  <span className="text-xs text-primary">{appt.doctor}</span>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No appointments today</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -158,19 +237,19 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {[
-                { id: "INV-1234", amount: "₹12,500", patient: "John Doe" },
-                { id: "INV-1235", amount: "₹8,300", patient: "Jane Smith" },
-                { id: "INV-1236", amount: "₹15,700", patient: "Mike Wilson" },
-              ].map((bill, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-medium">{bill.id}</p>
-                    <p className="text-xs text-muted-foreground">{bill.patient}</p>
+              {pendingBills && pendingBills.length > 0 ? (
+                pendingBills.map((bill: any) => (
+                  <div key={bill.id} className="flex items-center justify-between text-sm">
+                    <div>
+                      <p className="font-medium">{bill.bill_number}</p>
+                      <p className="text-xs text-muted-foreground">{bill.patients?.full_name}</p>
+                    </div>
+                    <span className="font-bold text-warning">₹{Number(bill.total_amount).toLocaleString()}</span>
                   </div>
-                  <span className="font-bold text-warning">{bill.amount}</span>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No pending bills</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -181,23 +260,21 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {[
-                { type: "Low Stock", item: "Paracetamol 500mg", status: "critical" },
-                { type: "Equipment", item: "X-Ray Machine #2", status: "warning" },
-                { type: "Expiry Alert", item: "5 items expiring soon", status: "warning" },
-              ].map((alert, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-medium">{alert.type}</p>
-                    <p className="text-xs text-muted-foreground">{alert.item}</p>
+              {lowStockItems && lowStockItems.length > 0 ? (
+                lowStockItems.map((item: any) => (
+                  <div key={item.id} className="flex items-center justify-between text-sm">
+                    <div>
+                      <p className="font-medium">Low Stock</p>
+                      <p className="text-xs text-muted-foreground">{item.medicine_name}</p>
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive">
+                      critical
+                    </span>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    alert.status === 'critical' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'
-                  }`}>
-                    {alert.status}
-                  </span>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No alerts</p>
+              )}
             </div>
           </CardContent>
         </Card>
