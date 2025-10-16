@@ -15,6 +15,7 @@ import {
   Utensils,
   ClipboardList,
   UserPlus,
+  Settings,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,10 @@ const additionalModules = [
   { title: "Diet & Kitchen", url: "/diet", icon: Utensils },
   { title: "Inventory", url: "/inventory", icon: Package },
   { title: "Reports", url: "/reports", icon: FileText },
+];
+
+const systemModules = [
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -95,6 +100,24 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {additionalModules.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} className={getNavClass}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>System</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {systemModules.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavClass}>

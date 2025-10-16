@@ -21,6 +21,7 @@ import Roster from "./pages/Roster";
 import DietKitchen from "./pages/DietKitchen";
 import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 
@@ -63,6 +64,7 @@ const App = () => (
                             <Route path="/diet" element={<DietKitchen />} />
                             <Route path="/inventory" element={<Inventory />} />
                             <Route path="/reports" element={<Reports />} />
+                            <Route path="/settings" element={<Settings />} />
                             <Route path="*" element={<NotFound />} />
                           </Routes>
                         </main>
